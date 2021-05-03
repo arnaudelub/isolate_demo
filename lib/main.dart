@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:isolate';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -21,6 +22,8 @@ class _AnimatedContainerAppState extends State<AnimatedContainerApp> {
   BorderRadiusGeometry _borderRadius = BorderRadius.circular(8);
   Timer? timer;
   GlobalKey _scaffoldKey = GlobalKey();
+  Isolate? isolate;
+  StreamSubscription? _isolateStreamSubscription;
 
   @override
   void initState() {
@@ -50,18 +53,39 @@ class _AnimatedContainerAppState extends State<AnimatedContainerApp> {
   @override
   void dispose() {
     timer?.cancel();
+    _isolateStreamSubscription?.cancel();
     super.dispose();
   }
 
-  Future<void> _calculateOrCompute({bool isCompute = true}) async {
+  Future<void> _startIsolate() async {
+    final ReceivePort receivePort = ReceivePort();
+    isolate = await Isolate.spawn(_task, receivePort.sendPort);
+    _isolateStreamSubscription = receivePort.listen((data) {
+      isolate!.kill(priority: Isolate.immediate);
+      ScaffoldMessenger.of(_scaffoldKey.currentContext!)
+          .showSnackBar(SnackBar(content: Text(data)));
+    });
+  }
+
+  /// The task called by compute and Isolate.spawn() as to be static if inside a class
+  /// or it has to be a top-level function
+  Future<void> _calculateOrCompute(
+      {bool isCompute = false, bool isIsolate = false}) async {
     int result = 0;
     if (isCompute) {
       result = await compute(bigTask, bigNumber);
+      _showSnackBar("$result");
+    } else if (isIsolate) {
+      _startIsolate();
     } else {
       result = bigTask(bigNumber);
+      _showSnackBar("$result");
     }
+  }
+
+  void _showSnackBar(String result) {
     ScaffoldMessenger.of(_scaffoldKey.currentContext!)
-        .showSnackBar(SnackBar(content: Text(result.toString())));
+        .showSnackBar(SnackBar(content: Text(result)));
   }
 
   @override
@@ -91,22 +115,36 @@ class _AnimatedContainerAppState extends State<AnimatedContainerApp> {
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             FloatingActionButton(
+              backgroundColor: Colors.lightBlue,
               child:
                   Tooltip(message: 'Compute', child: Icon(Icons.play_for_work)),
               // When the user taps the button
               onPressed: () => _calculateOrCompute(isCompute: true),
             ),
             FloatingActionButton(
+              backgroundColor: Colors.lightBlueAccent,
+              child: Tooltip(
+                  message: 'Isolate', child: Icon(Icons.play_circle_fill)),
+              // When the user taps the button
+              onPressed: () => _calculateOrCompute(isIsolate: true),
+            ),
+            FloatingActionButton(
+              backgroundColor: Colors.redAccent,
               child:
                   Tooltip(message: 'Calculate', child: Icon(Icons.play_arrow)),
               // When the user taps the button
-              onPressed: () => _calculateOrCompute(isCompute: false),
+              onPressed: () => _calculateOrCompute(),
             ),
           ],
         ),
       ),
     );
   }
+}
+
+void _task(SendPort sendPort) {
+  final result = bigTask(bigNumber);
+  sendPort.send("Got the result: $result");
 }
 
 int bigTask(int n) {
