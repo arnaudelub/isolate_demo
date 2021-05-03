@@ -53,7 +53,7 @@ class _AnimatedContainerAppState extends State<AnimatedContainerApp> {
     super.dispose();
   }
 
-  Future<void> _calculateOrCompute({bool isCompute}) async {
+  Future<void> _calculateOrCompute({bool isCompute = true}) async {
     int result = 0;
     if (isCompute) {
       result = await compute(bigTask, bigNumber);
