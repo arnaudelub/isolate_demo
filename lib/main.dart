@@ -62,24 +62,23 @@ class _AnimatedContainerAppState extends State<AnimatedContainerApp> {
     isolate = await Isolate.spawn(_task, receivePort.sendPort);
     _isolateStreamSubscription = receivePort.listen((data) {
       isolate!.kill(priority: Isolate.immediate);
-      ScaffoldMessenger.of(_scaffoldKey.currentContext!)
-          .showSnackBar(SnackBar(content: Text(data)));
+      _showSnackBar("From isolate: $data");
     });
   }
 
-  /// The task called by compute and Isolate.spawn() as to be static if inside a class
+  /// The task called by compute and Isolate.spawn() has to be static if inside a class
   /// or it has to be a top-level function
   Future<void> _calculateOrCompute(
       {bool isCompute = false, bool isIsolate = false}) async {
     int result = 0;
     if (isCompute) {
       result = await compute(bigTask, bigNumber);
-      _showSnackBar("$result");
+      _showSnackBar("From compute: $result");
     } else if (isIsolate) {
       _startIsolate();
     } else {
       result = bigTask(bigNumber);
-      _showSnackBar("$result");
+      _showSnackBar("From mainThread: $result");
     }
   }
 
@@ -144,7 +143,7 @@ class _AnimatedContainerAppState extends State<AnimatedContainerApp> {
 
 void _task(SendPort sendPort) {
   final result = bigTask(bigNumber);
-  sendPort.send("Got the result: $result");
+  sendPort.send("$result");
 }
 
 int bigTask(int n) {
